@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<!--<<  >>-->
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Script-Type" content="text/javascript">
+	<title>さんもくならべ</title>
+	<style>
+	html {
+		background: pink;
+		height: 100%;
+		font-size: 16px;
+	}
+
+	body {
+		margin: 0;
+		padding: 0;
+		height: 100%;
+		font-family: Verdana, sans-serif;
+	}
+		
+	div#container { /* 全体の枠 */
+		margin: 0 auto; /* 上下の余白を調整し、横を中央揃えにする */
+		padding: 0;
+		position: relative; /* 以下、ポジションの基準要素とする */
+		width: 550px;
+		height: 100%;
+		min-height: 100%;
+		background: white;
+		box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+	}
+
+	div#header {
+		/* 扉表示部分を左側配置 */
+		position: absolute;
+		top: 20px;
+		left: 0;
+		padding: 1rem;
+		width: 100%;
+		box-sizing: border-box; /* 余白を自動計算 */
+		background: white;
+		z-index: 2;
+		opacity: 1;
+		transition: 1.0s; /* ゆっくり変化させる このクラスに設定する */
+	}
+	div#header.cont-open { /* 扉表示部分の移動 */
+		opacity: 0; /* 透明度設定 */
+		left: -580px;
+	}
+	div#panel {
+		/* 勝敗表示を行うリボンの配置 */
+		position: absolute;
+		top: 140px;
+		left: 500px;
+		box-sizing: border-box; /* 余白を自動計算 */
+		background: white;
+		z-index: 1;
+		opacity: 0; /* 透明度設定 */
+	}
+	div#panel.judgeAnimation { /* 勝敗表示リボンのアニメーション */
+    animation-name: Slidein; 
+    animation-duration: 4s;           /* 変化にかかる時間 */
+    animation-timing-function: ease;
+    animation-delay: 0.5s;
+    animation-iteration-count: 1;     /* 繰り返し回数 */
+    animation-direction: normal;      /* 動きの向き:順行 */
+	}
+	@keyframes Slidein {
+	    0% {
+			left: 500px;
+			opacity: 0;
+	    }
+	    45% {
+	        left: 155px;
+			opacity: 1; /* 透明度設定 */
+	    }
+	    50% {
+	        left: 155px;
+			opacity: 1; /* 透明度設定 */
+	    }
+	    55% {
+	        left: 155px;
+			opacity: 1; /* 透明度設定 */
+	    }
+	    100% {
+	        left: -200px;
+			opacity: 0;
+	    }
+	}
+
+	div#contents {
+		/* 本体部分を右側配置 */
+		position: absolute;
+		top: 40px;
+		right: 0;
+		padding: 4px;
+		width: 100%;
+		box-sizing: border-box; /* 余白を自動計算 */
+	}
+
+	.line {
+		font-size: 0; /* ブロック要素の隙間を無くす効果 */
+	}
+	.masu {
+		margin: 0;
+		display: inline-block;  /* 要素を横並びにする為の宣言 */
+		color: dimgray;
+		text-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+		font-size: 4rem;
+		font-weight: bold;
+		height: 5rem;
+		width: 5rem;
+		text-align: center;	/* テキストを横中央揃えに */
+		line-height: 5rem;  /* テキストを上下中央揃えに */
+		background: floralwhite;
+		overflow: auto;
+	}
+	.masu:not(:last-of-type) {
+		border-right:  2px solid gray;
+	}
+	.masu:not([id$="3"]) {
+		border-bottom: 2px solid gray;
+	}
+
+	/* マウスカーソルが要素の上にある場合、背景色変更 */
+	/* 但し、要素が存在する場合は変化しない */
+	.masu:hover:empty {
+		background: rgba(00, 00, 255, 0.3);
+	}
+	/* マスに入力した時のエフェクト */
+	.masuActive {
+		transform: rotate(720deg); /* 回転する表現 */
+		transition: 0.8s; /* 変化させる時間 */
+	}
+	.masuAnimation {
+/*		transition-delay: 3.0s; 
+		transform: rotate(-720deg);
+		transition: 0.8s;
+*/
+		animation-name: putBAtSU;
+		animation-duration: 0.3s;           /* 変化にかかる時間 */ 
+/*		animation-timing-function: linear;*/  /* 等間隔で変化 */
+		animation-timing-function: ease;  /* 最初すばやく、後半ゆっくり */
+		animation-iteration-count: 2;   /* 繰り返し回数 */
+		animation-direction: normal;
+	}
+	@keyframes putBAtSU {
+		0% {
+			transform: scaleY(1.0);
+		}
+		25% {
+			transform: scaleY(0.1);
+		}
+		50% {
+			transform: scaleY(1.0);
+		}
+		75% {
+			transform: scaleY(0.1);
+		}
+		100% {
+			transform: scaleY(1.0);
+		}
+	}
+
+	.title {
+		margin-top: 4rem;
+		margin-bottom: 6rem;
+		color: white;
+		font-size: 2rem;
+		font-weight: bold;
+		text-shadow: 0 0 24px rgba(255, 0, 0, 1);
+	}
+
+	/* ボタンスタイルの共通設定 */
+	.button {
+		margin: 0 2px; /* 上下の余白をゼロにして、横の余白を調整 */
+		display: inline-block;  /* 要素を横並びにする為の宣言 */
+		width: 6rem;
+		height: 2rem;
+		border-radius: 0.8rem; /* 角丸 */
+		text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+		box-shadow:  0 0 8px rgba(0, 0, 0, 0.6);
+		color: white;
+		font-size: 1.5rem;
+		font-weight: bold;
+		text-align: center;	/* テキストを横中央揃えに */
+		line-height: 2rem;  /* テキストを上下中央揃えに */
+		background-image: linear-gradient(lightgreen, limegreen);
+		cursor: pointer;  /* クリックできる事を表すマウスカーソル */
+	}
+	.button:active { /* マウスクリック時 */
+		color: yellow;
+		box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+	}
+	/* ボタンの個別設定 */
+	#gstart {
+		margin-bottom: 4rem;
+	}
+	#btnReset {
+		width: 8rem;
+	}
+
+	/* リボンスタイルの設定 */
+	.ribbon {
+		margin: 0 2px; /* 上下の余白をゼロにして、横の余白を調整 */
+		display: inline-block;  /* 要素を横並びにする為の宣言 */
+		width: 14rem;
+		height: 3rem;
+		border: 3px solid gold;
+		text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+		box-shadow:  0 0 8px rgba(0, 0, 0, 0.6);
+		font-size: 2rem;
+		font-weight: bold;
+		text-align: center;	/* テキストを横中央揃えに */
+		line-height: 3rem;  /* テキストを上下中央揃えに */
+	}
+	.even {
+		color: white;
+		background-image: linear-gradient(lightgreen, limegreen);
+	}
+	.win {
+		color: yellow;
+		background-image: linear-gradient(orange, red);
+	}
+	.lose {
+		color: white;
+		background-image: linear-gradient(blue, skyblue);
+	}
+
+	</style>
+</head>
+<body>
+
+	<div id="container">
+		<div id="header">
+			<div style="text-align:center;">
+				<hr>
+				<div class="title">さんもくならべ</div>
+				<div class="button" id="gstart">開始</div>
+				<hr>
+			</div>
+		</div>
+
+		<div id="panel">
+			<div style="text-align:center;">
+				<div class="ribbon" id="judge">勝ち負け</div>
+			</div>
+		</div>
+
+		<div id="contents">
+			<div style="text-align:center;">
+				<div class="line">
+					<div class="masu" id="A1">
+					</div><div class="masu" id="B1">
+					</div><div class="masu" id="C1"></div>
+				</div>
+				<div class="line">
+					<div class="masu" id="A2">
+					</div><div class="masu" id="B2">
+					</div><div class="masu" id="C2"></div>
+				</div>
+				<div class="line">
+					<div class="masu" id="A3">
+					</div><div class="masu" id="B3">
+					</div><div class="masu" id="C3"></div>
+				</div>
+				<p>
+				<hr>
+				<div class="button" id="btnReset">リセット</div>
+				<div class="button" id="btnReturn">戻る</div>
+			</div>
+		<div style="text-align:left; margin:2.5rem;">
+			「３目並べ」について：<br>
+			相手と交互に○×の印を付け、縦、横、斜めの何れかのラインに相手より早く同じ印を揃える事を競うゲームです。<br><p>
+			画面の色、書式、アニメーションはCSSの機能を使用しています。<br>
+			マウスクリックのイベント処理、相手（×）ターンの思考、勝敗の判定はJavaScriptを使用しています。
+		</div>
+		</div>
+	</div>
+
+<script>
+(function() {
+	'use strict';	// 厳密なエラーチェックをする
+
+	var turn = 0;   // ターンのカウント （最短で５ターン、最大９ターンで終了する）
+	// 入力値のオブジェクトを初期化 （0:未入力 1：まる -1：ばつ）
+	var cell = {
+		A1: 0, B1: 0, C1: 0,
+		A2: 0, B2: 0, C2: 0,
+		A3: 0, B3: 0, C3: 0
+	};
+
+	var gstart  = document.getElementById("gstart");    // 開始ボタン要素を取得
+	var breset  = document.getElementById("btnReset");  // リセットボタン要素を取得
+	var breturn = document.getElementById("btnReturn"); // 戻るボタン要素を取得
+	var page1  = document.getElementById("header");     // 扉ページ要素を取得
+	var page2  = document.getElementById("panel");      // 勝敗表示ページ要素を取得
+	var judge  = document.getElementById("judge");      // 勝敗表示リボン要素を取得
+	var masus  = document.getElementsByClassName('masu'); // 入力マス要素を全て取得
+
+	// 開始ボタン押下
+	gstart.addEventListener("click", function() {
+		reset();
+		page1.className = "cont-open";
+	});
+
+	// リセットボタン押下・・・盤面の初期化
+	breset.addEventListener("click", function() {
+		reset();
+	});
+
+	// 戻るボタン押下
+	breturn.addEventListener("click", function() {
+		page1.className = "";
+		page2.className = "";
+	});
+
+	//入力マスのイベントリスナー設定
+	for (var i = 0; i < masus.length; i++) {
+		masus[i].addEventListener("click", function(evt) { // クリックイベントの振る舞い
+			mark(evt); /* ユーザのターン */
+
+			// 勝利判定
+			if (turn >= 5) {
+				if (winner() === 1) {
+					page2.className = "judgeAnimation";
+					return;
+				};
+			};
+			if (turn === 9) {
+				// 引き分け
+				judge.innerHTML = "引き分け"
+				judge.className = "ribbon even";
+				page2.className = "judgeAnimation";
+				return;
+			};
+			// こんぴゅーた様のターン
+			setTimeout(function () {
+				// タイマーを使って、考えているフリを演出
+				cpuTurn();
+
+				// 勝利判定
+				if (turn >= 5) {
+					if (winner() === 1) {
+						page2.className = "judgeAnimation";
+						return;
+					};
+				};
+			}, 1500);
+		});
+	}
+
+	// 盤面リセット
+	function reset() {
+		turn = 0;
+		for (var i = 0; i < masus.length; i++) {
+			masus[i].innerText = "";
+			masus[i].className = "masu";
+			cell[masus[i].id] = 0;
+		}
+		page2.className = "";
+	};
+
+	// ユーザのターン
+	function mark(evt) {
+		var id = evt.target.id;
+
+		if (document.getElementById(id).innerText !== "") {
+			return;
+		} else {
+			turn++; /* ターンのカウント */
+			console.log("ユーザのターン：" + String(turn));
+
+			document.getElementById(id).innerText = "○";
+			document.getElementById(id).className = "masu masuActive";
+			markcell(id, 1); /* 記録 */
+		}
+	};
+
+	// こんぴゅーた様のターン
+	function cpuTurn() {
+		var cpu = 0;
+
+		// 乱数取得（乱数は０以上、１未満を生成する）
+		cpu = Math.floor(Math.random() * 9); // 0～9のいづれか
+		// 最初の一手は乱数で適当に（そうしないと、必ず引き分ける）
+		if (turn === 1) {
+			while (masus[cpu].innerText !== "") {
+				// 入力済みの場合、もう一度乱数を生成
+				cpu = Math.floor(Math.random() * 9);
+			};
+		} else {
+		// ユーザの邪魔をする一手
+			switch (true) {
+			case (cell["A1"] + cell["B1"] + cell["C1"] === -2):
+			case (cell["A1"] + cell["B1"] + cell["C1"] === 2):
+				console.log("ＣＰＵの思考１");
+				for (var i = 0; i < 3; i++) {
+					if (masus[i].innerText === "") {
+						cpu = i;
+						break;
+					};
+				};
+				break;
+			case (cell["A2"] + cell["B2"] + cell["C2"] === -2):
+			case (cell["A2"] + cell["B2"] + cell["C2"] === 2):
+				console.log("ＣＰＵの思考２");
+				for (var i = 3; i < 6; i++) {
+					if (masus[i].innerText === "") {
+						cpu = i;
+						break;
+					};
+				};
+				break;
+			case (cell["A3"] + cell["B3"] + cell["C3"] === -2):
+			case (cell["A3"] + cell["B3"] + cell["C3"] === 2):
+				console.log("ＣＰＵの思考３");
+				for (var i = 6; i < 9; i++) {
+					if (masus[i].innerText === "") {
+						cpu = i;
+						break;
+					};
+				};
+				break;
+			case (cell["A1"] + cell["A2"] + cell["A3"] === -2):
+			case (cell["A1"] + cell["A2"] + cell["A3"] === 2):
+				console.log("ＣＰＵの思考４");
+				for (var i = 1; i < 4; i++) {
+					if (cell["A" + String(i)] === 0) {
+						cpu = (i - 1) * 3;
+						break;
+					};
+				};
+				break;
+			case (cell["B1"] + cell["B2"] + cell["B3"] === -2):
+			case (cell["B1"] + cell["B2"] + cell["B3"] === 2):
+				console.log("ＣＰＵの思考５");
+				for (var i = 1; i < 4; i++) {
+					if (cell["B" + String(i)] === 0) {
+						cpu = 1 + (i - 1) * 3;
+						break;
+					};
+				};
+				break;
+			case (cell["C1"] + cell["C2"] + cell["C3"] === -2):
+			case (cell["C1"] + cell["C2"] + cell["C3"] === 2):
+				console.log("ＣＰＵの思考６");
+				for (var i = 1; i < 4; i++) {
+					if (cell["C" + String(i)] === 0) {
+						cpu = 2 + (i - 1) * 3;
+						break;
+					};
+				};
+				break;
+			case (cell["A1"] + cell["B2"] + cell["C3"] === -2):
+			case (cell["A1"] + cell["B2"] + cell["C3"] === 2):
+				console.log("ＣＰＵの思考７");
+				for (var i = 0; i < 3; i++) {
+					if (masus[i * 4].innerText === "") {
+						cpu = i * 4;
+						break;
+					};
+				};
+				break;
+			case (cell["A3"] + cell["B2"] + cell["C1"] === -2):
+			case (cell["A3"] + cell["B2"] + cell["C1"] === 2):
+				console.log("ＣＰＵの思考８");
+				for (var i = 0; i < 3; i++) {
+					if (masus[2 + (i * 2)].innerText === "") {
+						cpu = 2 + (i * 2);
+						break;
+					};
+				};
+				break;
+			default:
+				console.log("ＣＰＵの思考９");
+				if (turn !== 9) {
+					while (masus[cpu].innerText !== "") {
+						// 入力済みの場合、もう一度乱数を生成
+						cpu = Math.floor(Math.random() * 9);
+					};
+				};
+				break;
+			};
+		};
+
+		turn++; /* ターンのカウント */
+		console.log("ＣＰＵのターン：" + String(turn));
+
+		masus[cpu].innerText = "×";
+		masus[cpu].className = "masu masuAnimation";
+		markcell(masus[cpu].id, -1);
+	};
+
+	// 勝利判定
+	function winner() {
+		switch (true) {
+		case (cell["A1"] + cell["B1"] + cell["C1"] === -3):
+		case (cell["A2"] + cell["B2"] + cell["C2"] === -3):
+		case (cell["A3"] + cell["B3"] + cell["C3"] === -3):
+		case (cell["A1"] + cell["A2"] + cell["A3"] === -3):
+		case (cell["B1"] + cell["B2"] + cell["B3"] === -3):
+		case (cell["C1"] + cell["C2"] + cell["C3"] === -3):
+		case (cell["A1"] + cell["B2"] + cell["C3"] === -3):
+		case (cell["A3"] + cell["B2"] + cell["C1"] === -3):
+			console.log("勝利判定:ＣＰＵの勝ち");
+			judge.className = "ribbon lose";
+			judge.innerHTML = "負けました"
+			return 1;
+			break;
+		case (cell["A1"] + cell["B1"] + cell["C1"] === 3):
+		case (cell["A2"] + cell["B2"] + cell["C2"] === 3):
+		case (cell["A3"] + cell["B3"] + cell["C3"] === 3):
+		case (cell["A1"] + cell["A2"] + cell["A3"] === 3):
+		case (cell["B1"] + cell["B2"] + cell["B3"] === 3):
+		case (cell["C1"] + cell["C2"] + cell["C3"] === 3):
+		case (cell["A1"] + cell["B2"] + cell["C3"] === 3):
+		case (cell["A3"] + cell["B2"] + cell["C1"] === 3):
+			console.log("勝利判定:ユーザの勝ち");
+			judge.className = "ribbon win";
+			judge.innerHTML = "勝ちました！"
+			return 1;
+			break;
+		default:
+			return 0;
+			break;
+		};
+	};
+
+	// 入力値の記録
+	function markcell(id, mk) {
+		cell[id] = mk;
+		console.log("入力：" + id + "=" + String(cell[id]));
+	};
+
+})();
+</script>
+</body>
+</html>
